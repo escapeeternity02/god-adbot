@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESCAPExETERNITY Bot Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f6f9;
+            color: #333;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #FF6347;
+        }
+        .stats-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+        }
+        .stats-table th, .stats-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+        .stats-table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .stats-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .stats-table tr:hover {
+            background-color: #ddd;
+        }
+        .status {
+            font-weight: bold;
+        }
+        .status-ok {
+            color: #4CAF50;
+        }
+        .status-warning {
+            color: #FF9800;
+        }
+        .status-error {
+            color: #F44336;
+        }
+        #update-time {
+            font-size: 12px;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>ESCAPExETERNITY Bot Dashboard</h1>
+
+    <table class="stats-table">
+        <tr>
+            <th>Status</th>
+            <th>Session</th>
+            <th>Groups Done</th>
+            <th>Messages Sent</th>
+            <th>FloodWaits</th>
+            <th>Current Delay</th>
+            <th>Last Send Time</th>
+        </tr>
+        <tr id="status-row">
+            <td class="status status-ok" id="status">Loading...</td>
+            <td id="session">Loading...</td>
+            <td id="groups-done">0 / 0</td>
+            <td id="messages-sent">0</td>
+            <td id="floodwaits">0</td>
+            <td id="current-delay">0s</td>
+            <td id="last-send">N/A</td>
+        </tr>
+    </table>
+
+    <div id="update-time">Last Updated: Loading...</div>
+</div>
+
+<script>
+    function updateStats() {
+        fetch('/stats/json')
+            .then(response => response.json())
+            .then(data => {
+                // Parsing stats and updating dashboard
+                document.getElementById('status').innerText = data.status || 'Unknown';
+                document.getElementById('status').className = 'status ' + (data.status.toLowerCase() === 'sending messages' ? 'status-ok' : 'status-warning');
+                document.getElementById('session').innerText = data.session || 'Unknown';
+                document.getElementById('groups-done').innerText = data.groups_done || '0 / 0';
+                document.getElementById('messages-sent').innerText = data.messages_sent || '0';
+                document.getElementById('floodwaits').innerText = data.floodwaits || '0';
+                document.getElementById('current-delay').innerText = data.current_delay || '0s';
+                document.getElementById('last-send').innerText = data.last_send || 'N/A';
+                document.getElementById('update-time').innerText = 'Last Updated: ' + new Date().toLocaleTimeString();
+            })
+            .catch(error => {
+                console.error('Error fetching stats:', error);
+            });
+    }
+
+    setInterval(updateStats, 5000); // Update stats every 5 seconds
+    window.onload = updateStats; // Initial load
+</script>
+
+</body>
+</html>
