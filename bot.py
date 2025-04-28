@@ -6,6 +6,7 @@ from telethon.tl.functions.messages import GetHistoryRequest
 from colorama import Fore, Style, init
 import pyfiglet
 from aiohttp import web
+import datetime
 
 # Initialize colorama for colorful outputs
 init(autoreset=True)
@@ -38,6 +39,7 @@ async def start_web_server():
     
     app = web.Application()
     app.router.add_get('/', handle)
+    app.router.add_get('/stats/json', get_stats)  # Ensure stats endpoint is available
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', int(os.environ.get("PORT", 10000)))
@@ -52,6 +54,15 @@ def update_bot_stats(status, groups_done, messages_sent, floodwaits, current_del
     bot_stats["floodwaits"] = floodwaits
     bot_stats["current_delay"] = current_delay
     bot_stats["last_send"] = last_send
+
+# Serve the dashboard HTML
+async def stats_handler(request):
+    with open("dashboard.html", "r") as f:
+        return web.Response(text=f.read(), content_type="text/html")
+
+# API route to send stats in JSON format
+async def get_stats(request):
+    return web.json_response(bot_stats)
 
 # Auto sender with group forwarding
 async def auto_pro_sender(client, delay_after_all_groups):
@@ -69,15 +80,18 @@ async def auto_pro_sender(client, delay_after_all_groups):
                 min_id=0,
                 add_offset=0,
                 hash=0))
+            
             if not history.messages:
                 print(Fore.RED + f"No messages found in Saved Messages for session {session_id}.")
                 await asyncio.sleep(60)
                 continue
+
             saved_messages = history.messages
             print(Fore.CYAN + f"{len(saved_messages)} saved messages retrieved for session {session_id}.\n")
 
             groups = sorted([d for d in await client.get_dialogs() if d.is_group], key=lambda g: g.name.lower() if g.name else "")
             repeat = 1
+
             while True:
                 print(Fore.CYAN + f"\nStarting repetition {repeat} (Unlimited mode)")
                 for group in groups:
@@ -85,26 +99,21 @@ async def auto_pro_sender(client, delay_after_all_groups):
                         try:
                             await client.forward_messages(group.id, msg.id, "me")
                             print(Fore.GREEN + f"Message sent to group: {group.name or group.id}")
+                            update_bot_stats("Sending messages", len(groups), len(saved_messages), bot_stats["floodwaits"], f"{delay_after_all_groups}s", str(datetime.datetime.now()))
+                        except errors.FloodWaitError as e:
+                            print(Fore.RED + f"Flood wait error: {e}. Retrying in {e.seconds} seconds.")
+                            update_bot_stats("Waiting for flood", len(groups), len(saved_messages), bot_stats["floodwaits"], f"{e.seconds}s", str(datetime.datetime.now()))
+                            await asyncio.sleep(e.seconds)
                         except Exception as e:
                             print(Fore.RED + f"Error forwarding to {group.name or group.id}: {e}")
 
                 print(Fore.CYAN + f"\nCompleted repetition {repeat}. Waiting {delay_after_all_groups} seconds...")
-                update_bot_stats("Sending messages", len(groups), len(saved_messages), 0, f"{delay_after_all_groups}s", "N/A")
                 await asyncio.sleep(delay_after_all_groups)
                 repeat += 1
         except Exception as e:
             print(Fore.RED + f"Error in auto_pro_sender: {e}")
             print(Fore.YELLOW + "Retrying in 30 seconds...")
             await asyncio.sleep(30)
-
-# Serve the dashboard HTML
-async def stats_handler(request):
-    with open("dashboard.html", "r") as f:
-        return web.Response(text=f.read(), content_type="text/html")
-
-# API route to send stats in JSON format
-async def get_stats(request):
-    return web.json_response(bot_stats)
 
 # Main function with auto-reconnect
 async def main():
